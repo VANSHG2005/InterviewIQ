@@ -8,10 +8,12 @@ const rateLimit = require('express-rate-limit')
 const path = require('path')
 
 const authRoutes = require('./routes/auth')
+const userRoutes = require('./routes/users')
 const resumeRoutes = require('./routes/resume')
 const interviewRoutes = require('./routes/interviews')
 const reportRoutes = require('./routes/reports')
 const speechRoutes = require('./routes/speech')
+const adminRoutes = require('./routes/admin')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -44,10 +46,12 @@ const aiLimiter = rateLimit({
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes)
+app.use('/api/users', userRoutes)
 app.use('/api/resume', resumeRoutes)
 app.use('/api/interviews', aiLimiter, interviewRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/speech', speechRoutes)
+app.use('/api/admin', adminRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => res.json({

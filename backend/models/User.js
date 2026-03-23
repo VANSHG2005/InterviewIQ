@@ -63,6 +63,8 @@ const userSchema = new mongoose.Schema({
   }],
   activeResumeId: mongoose.Schema.Types.ObjectId,
 
+  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+
   // Legacy support (skills/technologies from latest resume)
   skills: [{ type: String, trim: true }],
   technologies: [{ type: String, trim: true }],
@@ -94,6 +96,9 @@ const userSchema = new mongoose.Schema({
   badges: [{ type: String }],
   totalInterviews: { type: Number, default: 0 },
   averageScore: { type: Number, default: 0 },
+  points: { type: Number, default: 0 },
+  totalPoints: { type: Number, default: 0 },
+  level: { type: Number, default: 1 },
 
 }, { timestamps: true })
 

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Brain, Target, BookOpen, ChevronRight, Award,
   AlertTriangle, CheckCircle2, RotateCcw, Home,
-  Loader2, Lightbulb, Calendar,
+  Loader2, Lightbulb, Calendar, Zap, Sparkles
 } from 'lucide-react'
 import { apiFetch } from '../context/auth.js'
 import {
@@ -60,6 +60,8 @@ export default function Results() {
   const [report,   setReport]    = useState(null)
   const [interview,setInterview] = useState(null)
   const [loading,  setLoading]   = useState(true)
+  const [error,    setError]     = useState(null)
+  const [showPoints, setShowPoints] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -68,10 +70,18 @@ export default function Results() {
           apiFetch(`/api/reports/${id}`),
           apiFetch(`/api/interviews/${id}`),
         ])
+        if (!rData.report) throw new Error('Report data is missing')
         setReport(rData.report)
         setInterview(iData.interview)
+        
+        // Show points animation if just completed
+        if (sessionStorage.getItem(`completed_${id}`)) {
+          setShowPoints(true)
+          sessionStorage.removeItem(`completed_${id}`)
+        }
       } catch (err) {
         console.error(err)
+        setError(err.message || 'Failed to load report')
       } finally {
         setLoading(false)
       }
@@ -88,12 +98,17 @@ export default function Results() {
     </div>
   )
 
-  if (!report) return (
+  if (error || !report) return (
     <div className="min-h-screen bg-void flex items-center justify-center pt-16">
-      <div className="text-center">
-        <AlertTriangle className="w-10 h-10 text-warning mx-auto mb-3" />
-        <p className="text-text-secondary mb-2">Report not found</p>
-        <Link to="/dashboard" className="text-electric text-sm">← Back to dashboard</Link>
+      <div className="text-center px-6">
+        <AlertTriangle className="w-12 h-12 text-warning mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-text-primary mb-2">Report Not Found</h2>
+        <p className="text-text-secondary mb-6 max-w-sm mx-auto">
+          {error || 'This report may still be generating or you don\'t have permission to view it.'}
+        </p>
+        <Link to="/dashboard" className="btn-primary">
+          <Home className="w-4 h-4" /> Back to Dashboard
+        </Link>
       </div>
     </div>
   )
@@ -110,7 +125,46 @@ export default function Results() {
   ]
 
   return (
-    <div className="min-h-screen bg-void pt-20 pb-16">
+    <div className="min-h-screen bg-void pt-20 pb-16 relative">
+
+      {/* ── Points Overlay ── */}
+      <AnimatePresence>
+        {showPoints && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/80 backdrop-blur-md"
+            onClick={() => setShowPoints(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.5, y: 40, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              transition={{ type: 'spring', damping: 15 }}
+              className="glass-bright p-10 rounded-[3rem] text-center border-2 border-neon/30 relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-neon/5 animate-pulse" />
+              <div className="relative z-10">
+                <div className="w-20 h-20 rounded-3xl bg-neon-gradient flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(16,233,181,0.3)]">
+                  <Zap className="w-10 h-10 text-white fill-white" />
+                </div>
+                <h2 className="text-3xl font-display font-bold text-text-primary mb-2">Score Awarded!</h2>
+                <div className="text-5xl font-mono font-black text-neon mb-6">+{Math.floor(overall * 10) + 50} XP</div>
+                <div className="flex justify-center gap-1.5 mb-8">
+                   {[1,2,3].map(i => <Sparkles key={i} className="w-5 h-5 text-neon animate-bounce" style={{ animationDelay: `${i * 0.2}s` }} />)}
+                </div>
+                <button 
+                  onClick={() => setShowPoints(false)}
+                  className="btn-primary py-3 px-10 glow-neon text-sm font-bold uppercase tracking-widest"
+                >
+                  CONTINUE
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-5xl mx-auto px-6">
 
         {/* Breadcrumb */}
@@ -212,7 +266,7 @@ export default function Results() {
               <div className="mt-4">
                 <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Strengths</p>
                 <div className="flex flex-wrap gap-2">
-                  {report.strengths.map((str, i) => (
+                  {report.strengths?.map((str, i) => (
                     <span key={i} className="text-xs bg-success/10 text-success border border-success/20 px-2 py-1 rounded-lg">
                       {str}
                     </span>
@@ -233,7 +287,7 @@ export default function Results() {
               <h2 className="font-display font-semibold text-text-primary">Question Breakdown</h2>
             </div>
             <div className="space-y-4">
-              {report.questionBreakdown.map((item, i) => (
+              {report.questionBreakdown?.map((item, i) => (
                 <div key={i} className="bg-void/40 rounded-xl p-4 border border-border/40">
                   <div className="flex items-start justify-between gap-4 mb-3">
                     <div className="flex-1">
@@ -277,7 +331,7 @@ export default function Results() {
               <h2 className="font-display font-semibold text-text-primary">Skill Gaps</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {report.weakTopics.map((topic, i) => (
+              {report.weakTopics?.map((topic, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-warning/5 border border-warning/20">
                   <div className="w-6 h-6 rounded-lg bg-warning/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <span className="text-warning text-xs font-bold">{i + 1}</span>
@@ -304,7 +358,7 @@ export default function Results() {
               <h2 className="font-display font-semibold text-text-primary">Your Learning Roadmap</h2>
             </div>
             <div className="space-y-3">
-              {report.roadmap.map((week, i) => {
+              {report.roadmap?.map((week, i) => {
                 const c = WEEK_COLORS[i % WEEK_COLORS.length]
                 return (
                   <motion.div
@@ -323,7 +377,7 @@ export default function Results() {
                       <p className="text-text-muted text-xs leading-relaxed">{week.description}</p>
                       {week.resources?.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
-                          {week.resources.map((r, j) => (
+                          {week.resources?.map((r, j) => (
                             <span key={j} className="text-xs bg-border/60 text-text-secondary px-2 py-0.5 rounded-md flex items-center gap-1">
                               <BookOpen className="w-3 h-3" />{r}
                             </span>

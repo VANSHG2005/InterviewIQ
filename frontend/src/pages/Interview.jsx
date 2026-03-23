@@ -186,6 +186,10 @@ export default function Interview() {
     try {
       setSubmitting(true)
       await apiFetch(`/api/interviews/${id}/complete`, { method: 'POST' })
+      
+      // Set flag for results page animation
+      sessionStorage.setItem(`completed_${id}`, 'true')
+      
       toast.success('Report ready!')
       await delay(800)
       navigate(`/results/${id}`)

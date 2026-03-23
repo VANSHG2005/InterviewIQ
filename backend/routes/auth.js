@@ -39,6 +39,9 @@ router.post('/register', [
         badges: user.badges,
         streak: user.streak,
         totalInterviews: user.totalInterviews,
+        points: user.points,
+        level: user.level,
+        role: user.role,
       },
     })
   } catch (err) {
@@ -79,6 +82,9 @@ router.post('/login', [
         streak: user.streak,
         totalInterviews: user.totalInterviews,
         averageScore: user.averageScore,
+        points: user.points,
+        level: user.level,
+        role: user.role,
       },
     })
   } catch (err) {

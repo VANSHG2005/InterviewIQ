@@ -63,14 +63,51 @@ router.get('/stats', auth, async (req, res) => {
     const interviews = await Interview.find({
       userId: req.user._id,
       completed: true,
-    }).lean()
+    }).sort({ createdAt: 1 }).lean()
 
     const total = interviews.length
     const scores = interviews.map(iv => iv.scores?.overall || 0).filter(Boolean)
     const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
     const bestScore = scores.length ? Math.max(...scores) : 0
 
-    const user = await User.findById(req.user._id).select('streak badges')
+    const scoreHistory = interviews.slice(-10).map(iv => ({
+      date: iv.completedAt || iv.createdAt,
+      score: iv.scores?.overall || 0,
+      type: iv.type
+    }))
+
+    // Fetch reports for skill gaps and roadmap
+    const reports = await Report.find({ userId: req.user._id })
+      .sort({ generatedAt: -1 })
+      .lean()
+
+    // Aggregate skill gaps
+    const skillGapsMap = {}
+    const missingConcepts = []
+    
+    reports.forEach(report => {
+      if (report.weakTopics) {
+        report.weakTopics.forEach(wt => {
+          skillGapsMap[wt.topic] = (skillGapsMap[wt.topic] || 0) + 1
+        })
+      }
+      if (report.questionBreakdown) {
+        report.questionBreakdown.forEach(qb => {
+          if (qb.score < 6 && qb.feedback) {
+            missingConcepts.push(qb.feedback)
+          }
+        })
+      }
+    })
+
+    const skillGaps = Object.entries(skillGapsMap)
+      .map(([topic, count]) => ({ topic, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+
+    const latestRoadmap = reports.length > 0 ? reports[0].roadmap : []
+
+    const user = await User.findById(req.user._id).select('streak badges points level totalPoints')
 
     res.json({
       total,
@@ -78,8 +115,16 @@ router.get('/stats', auth, async (req, res) => {
       bestScore: parseFloat(bestScore.toFixed(2)),
       streak: user?.streak || 0,
       badges: user?.badges || [],
+      points: user?.points || 0,
+      level: user?.level || 1,
+      totalPoints: user?.totalPoints || 0,
+      scoreHistory,
+      skillGaps,
+      missingConcepts: missingConcepts.slice(0, 10),
+      latestRoadmap
     })
   } catch (err) {
+    console.error('Stats error:', err)
     res.status(500).json({ message: 'Failed to fetch stats' })
   }
 })
@@ -276,6 +321,18 @@ router.post('/:id/complete', auth, async (req, res) => {
     user.totalInterviews = (user.totalInterviews || 0) + 1
     user.updateStreak()
 
+    // Award points
+    const basePoints = 50
+    const scoreBonus = Math.floor(overall * 10)
+    const streakBonus = (user.streak || 0) * 5
+    const earned = basePoints + scoreBonus + streakBonus
+    
+    user.points = (user.points || 0) + earned
+    user.totalPoints = (user.totalPoints || 0) + earned
+    
+    // Level up logic (1000 XP per level)
+    user.level = Math.floor(user.totalPoints / 1000) + 1
+
     // Recalculate average score
     const allInterviews = await Interview.find({ userId: user._id, completed: true }).select('scores')
     const allScores = allInterviews.map(iv => iv.scores?.overall || 0).filter(Boolean)
@@ -291,6 +348,9 @@ router.post('/:id/complete', auth, async (req, res) => {
       interviewId: interview._id,
       reportId: report._id,
       scores: interview.scores,
+      earnedPoints: earned,
+      totalPoints: user.points,
+      level: user.level
     })
   } catch (err) {
     console.error('Completion error:', err)
