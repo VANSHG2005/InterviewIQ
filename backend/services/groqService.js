@@ -129,16 +129,25 @@ Rules:
 // ─── Quick Score (for adaptive difficulty) ───────────────────────────────────
 
 async function quickScoreAnswer(question, answer) {
-  const prompt = `Rate this interview answer from 1–10. Return ONLY a number.
+  const prompt = `Rate this interview answer on a scale of 1-10 for each: clarity, depth, confidence, relevance. 
+Respond ONLY with a JSON object.
 
 Question: ${question}
-Answer: ${answer.slice(0, 800)}
+Answer: ${answer.slice(0, 1000)}
 
-Score (1-10):`
+JSON format: {"clarity": 7, "depth": 6, "confidence": 8, "relevance": 7}`
 
-  const text = await chat([{ role: 'user', content: prompt }], { temperature: 0.1, maxTokens: 10 })
-  const score = parseFloat(text.match(/\d+(\.\d+)?/)?.[0] || '5')
-  return Math.min(10, Math.max(1, score))
+  const text = await chat([{ role: 'user', content: prompt }], { temperature: 0.1, maxTokens: 100 })
+  try {
+    const match = text.match(/\{.*\}/s)
+    if (match) {
+      return JSON.parse(match[0])
+    }
+    return { clarity: 5, depth: 5, confidence: 5, relevance: 5 }
+  } catch (err) {
+    console.error('Quick score parse error:', err)
+    return { clarity: 5, depth: 5, confidence: 5, relevance: 5 }
+  }
 }
 
 // ─── Brief In-Interview Feedback ─────────────────────────────────────────────

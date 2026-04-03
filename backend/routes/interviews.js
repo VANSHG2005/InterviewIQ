@@ -221,7 +221,8 @@ router.post('/:id/answer', auth, async (req, res) => {
     if (!question) return res.status(400).json({ message: 'Question not found' })
 
     // Quick score for adaptive difficulty
-    const quickScore = await quickScoreAnswer(question.text, answer)
+    const quickScores = await quickScoreAnswer(question.text, answer)
+    const quickScore = quickScores.overall || Math.round((quickScores.clarity + quickScores.depth + quickScores.confidence + quickScores.relevance) / 4)
 
     // Adaptive difficulty adjustment
     const currentDiff = interview.currentDifficulty || 5
@@ -253,6 +254,7 @@ router.post('/:id/answer', auth, async (req, res) => {
 
     res.json({
       feedback,
+      quickScores,
       done,
       answers: interview.answers.map(a => ({ text: a.text })),
     })
