@@ -28,6 +28,7 @@ export default function Interview() {
   const [timerOn,    setTimerOn]    = useState(false)
   const [recording,  setRecording]  = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [subtitleText, setSubtitleText] = useState('')
   const [quickScores, setQuickScores] = useState({ clarity: null, depth: null, confidence: null, relevance: null })
   const [transcribingText, setTranscribingText] = useState('')
 
@@ -137,9 +138,20 @@ export default function Interview() {
                  voices.find(v => v.lang.startsWith('en-US')) || voices[0]
     if (pref) utt.voice = pref
     return new Promise((resolve) => {
-      utt.onstart = () => setIsSpeaking(true)
-      utt.onend = () => { setIsSpeaking(false); resolve() }
-      utt.onerror = () => { setIsSpeaking(false); resolve() }
+      utt.onstart = () => {
+        setSubtitleText(text)
+        setTimeout(() => setIsSpeaking(true), 10)
+      }
+      utt.onend = () => {
+        setIsSpeaking(false)
+        setSubtitleText('')
+        resolve()
+      }
+      utt.onerror = () => {
+        setIsSpeaking(false)
+        setSubtitleText('')
+        resolve()
+      }
       window.speechSynthesis.speak(utt)
     })
   }
@@ -170,9 +182,20 @@ export default function Interview() {
       audioRef.current = audio
 
       return new Promise((resolve) => {
-        audio.onplay = () => setIsSpeaking(true)
-        audio.onended = () => { setIsSpeaking(false); resolve() }
-        audio.onerror = () => { setIsSpeaking(false); resolve() }
+        audio.onplay = () => {
+          setSubtitleText(text)
+          setIsSpeaking(true)
+        }
+        audio.onended = () => {
+          setIsSpeaking(false)
+          setSubtitleText('')
+          resolve()
+        }
+        audio.onerror = () => {
+          setIsSpeaking(false)
+          setSubtitleText('')
+          resolve()
+        }
         audio.play()
       })
     } catch (err) {
@@ -438,13 +461,31 @@ export default function Interview() {
 
            <AnimatePresence>
              {isSpeaking && (
-               <motion.div 
-                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                 className="absolute bottom-6 md:bottom-10 px-4 py-1.5 rounded-full bg-electric/10 border border-electric/20 text-electric text-[10px] font-bold flex items-center gap-2 shadow-lg backdrop-blur-md"
-               >
-                 <div className="w-1.5 h-1.5 rounded-full bg-electric animate-pulse" />
-                 INTERVIEWER IS SPEAKING
-               </motion.div>
+               <div className="absolute inset-0 z-40 flex flex-col items-center justify-end pb-24 pointer-events-none">
+                  <div className="px-10 mb-8">
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                      className="max-w-3xl bg-black/85 backdrop-blur-2xl border border-white/10 rounded-2xl px-8 py-5 text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] ring-1 ring-white/10"
+                    >
+                      <p className="text-base md:text-lg lg:text-xl text-white font-semibold leading-relaxed tracking-tight">
+                        {subtitleText}
+                      </p>
+                    </motion.div>
+                  </div>
+
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="px-4 py-2 rounded-full bg-electric/20 border border-electric/30 text-electric text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 shadow-lg backdrop-blur-md"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-electric animate-pulse shadow-[0_0_8px_#4f8ef7]" />
+                    INTERVIEWER IS SPEAKING
+                  </motion.div>
+               </div>
              )}
            </AnimatePresence>
         </div>
