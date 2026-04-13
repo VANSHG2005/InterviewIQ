@@ -1,10 +1,15 @@
 const express = require('express')
 const multer = require('multer')
 const Groq = require('groq-sdk')
+const { ElevenLabsClient } = require('@elevenlabs/elevenlabs-js')
 const auth = require('../middleware/auth')
 
 const router = express.Router()
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+
+const elevenlabs = new ElevenLabsClient({
+  apiKey: process.env.ELEVENLABS_API_KEY,
+})
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -52,37 +57,24 @@ router.post('/tts', auth, async (req, res) => {
       return res.status(500).json({ message: 'ElevenLabs API key not configured' })
     }
 
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': process.env.ELEVENLABS_API_KEY,
-      },
-      body: JSON.stringify({
+    const audioStream = await elevenlabs.textToSpeech.stream(
+      voiceId,
+      {
         text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.5,
-        },
-      }),
-    })
+        modelId: 'eleven_v3',
+      }
+    )
 
-    if (!response.ok) {
-      const err = await response.json()
-      throw new Error(err.detail?.message || 'ElevenLabs TTS failed')
+    res.setHeader('Content-Type', 'audio/mpeg')
+
+    for await (const chunk of audioStream) {
+      res.write(chunk)
     }
 
-    const audioBuffer = await response.arrayBuffer()
-    res.set({
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': audioBuffer.byteLength,
-    })
-    res.send(Buffer.from(audioBuffer))
+    res.end()
   } catch (err) {
     console.error('TTS error:', err)
-    res.status(500).json({ message: err.message })
+    res.status(500).json({ message: err.message || 'Error generating audio' })
   }
 })
 
